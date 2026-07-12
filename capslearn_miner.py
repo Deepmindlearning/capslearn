@@ -42,7 +42,7 @@ def log(base: Path, msg: str):
 
 
 CONTENT_CH = re.compile(r'[A-Za-z0-9一-鿿]')
-EXPAND_MAX = 6  # 替换片段向两侧最多扩展多少个相同字符，以还原完整术语
+EXPAND_MAX = 12  # 替换片段向两侧最多扩展多少个相同字符，以还原完整术语（英文词尾常超 6 字符）
 
 
 def has_content(s: str) -> bool:
