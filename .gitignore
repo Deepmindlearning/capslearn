@@ -1,0 +1,12 @@
+# 运行时数据 —— 永不入库（含个人语料/隐私）
+corrections.jsonl
+miner_state.json
+capture.log
+miner.log
+reports/
+backups/
+
+# 环境
+.venv/
+__pycache__/
+*.pyc
