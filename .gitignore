@@ -10,3 +10,9 @@ backups/
 .venv/
 __pycache__/
 *.pyc
+
+# 构建产物
+build/
+dist/
+dist-release/
+*.spec

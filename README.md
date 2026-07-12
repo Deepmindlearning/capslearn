@@ -26,9 +26,15 @@
 
 前提：已安装 [CapsWriter-Offline](https://github.com/HaujetZhao/CapsWriter-Offline) v2.6+（Windows 10/11）。
 
+**方式一（推荐，无需 Python）**：从 [Releases](https://github.com/Deepmindlearning/capslearn/releases) 下载 zip，解压到 CapsWriter 根目录下（如 `D:\CapsWriter-Offline\learn\`），双击 `CapsLearn-Capture\CapsLearn-Capture.exe` 启动采集端。程序会自动向上探测 CapsWriter 目录（找 `hot.txt` + `config_client.py`），放在 CapsWriter 目录树内即可，无需配置。
+
+> 若杀毒软件误报：这是 PyInstaller 打包 + 全局热键 + 剪贴板操作的常见误判，代码全部开源可审计，请自行加白或改用方式二从源码运行。
+
+**方式二（从源码）**：
+
 ```powershell
 # 1. 放置：把本仓库放到 CapsWriter 根目录下的 learn\ 文件夹
-#    （脚本默认按 D:\CapsWriter-Offline 布局，装在别处改脚本顶部 DEFAULT_BASE 即可）
+#    （其他位置用 --base 参数或改脚本顶部 DEFAULT_BASE）
 
 # 2. 环境（Python 3.10+，两个依赖）
 python -m venv learn\.venv

@@ -14,13 +14,25 @@ import difflib
 import json
 import re
 import shutil
+import sys
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
 DEFAULT_BASE = Path(r'D:\CapsWriter-Offline')
+
+
+def find_base(cli_value=None) -> Path:
+    """定位 CapsWriter 根目录：命令行指定 > 从脚本/exe 所在位置向上找 > 默认值。"""
+    if cli_value:
+        return Path(cli_value)
+    anchor = Path(sys.executable if getattr(sys, 'frozen', False) else __file__).resolve().parent
+    for d in (anchor, *anchor.parents):
+        if (d / 'hot.txt').exists() and (d / 'config_client.py').exists():
+            return d
+    return DEFAULT_BASE
 AUTO_ADD_MIN = 2      # 出现多少次自动写入 hot.txt
-MAX_TERM_LEN = 10     # 替换片段的最大长度（太长不是术语，是改写）
+MAX_TERM_LEN = 16     # 替换片段的最大长度（太长不是术语，是改写；英文单词常超 10 字符）
 MARKER = '# ====== 自学习（capslearn 自动追加） ======'
 
 
@@ -153,11 +165,11 @@ def update_hot(hot_path: Path, additions, backups_dir: Path, dry_run: bool):
 
 def main():
     ap = argparse.ArgumentParser(description='CapsLearn 学习端')
-    ap.add_argument('--base', default=str(DEFAULT_BASE), help='CapsWriter 根目录')
+    ap.add_argument('--base', default=None, help='CapsWriter 根目录（默认自动向上探测）')
     ap.add_argument('--dry-run', action='store_true', help='只分析不写任何文件')
     ap.add_argument('--all', action='store_true', help='忽略进度，重新处理全部配对')
     args = ap.parse_args()
-    base = Path(args.base)
+    base = find_base(args.base)
     learn = base / 'learn'
     corrections = learn / 'corrections.jsonl'
     state_file = learn / 'miner_state.json'

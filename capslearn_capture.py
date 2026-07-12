@@ -15,12 +15,32 @@ import json
 import queue
 import re
 import socket
+import sys
 import threading
 import time
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
 DEFAULT_BASE = Path(r'D:\CapsWriter-Offline')
+
+
+def find_base(cli_value=None) -> Path:
+    """定位 CapsWriter 根目录：命令行指定 > 从脚本/exe 所在位置向上找 > 默认值。"""
+    if cli_value:
+        return Path(cli_value)
+    anchor = Path(sys.executable if getattr(sys, 'frozen', False) else __file__).resolve().parent
+    for d in (anchor, *anchor.parents):
+        if (d / 'hot.txt').exists() and (d / 'config_client.py').exists():
+            return d
+    return DEFAULT_BASE
+
+
+def say(*args):
+    """noconsole 打包后 stdout 可能不存在，print 需要兜底。"""
+    try:
+        print(*args)
+    except Exception:
+        pass
 SIM_THRESHOLD = 0.45      # 终稿与转写的最低相似度，低于视为没配上
 LOOKBACK_DAYS = 2         # 在最近几天的日记里找原始转写
 LOOKBACK_ENTRIES = 150    # 最多回看多少条
@@ -199,24 +219,24 @@ def run_ui():
 
 def main():
     ap = argparse.ArgumentParser(description='CapsLearn 采集端')
-    ap.add_argument('--base', default=str(DEFAULT_BASE), help='CapsWriter 根目录')
+    ap.add_argument('--base', default=None, help='CapsWriter 根目录（默认自动向上探测）')
     ap.add_argument('--test', help='跳过热键与剪贴板，把该文本当作选中内容跑一遍配对')
     args = ap.parse_args()
-    base = Path(args.base)
+    base = find_base(args.base)
     (base / 'learn').mkdir(parents=True, exist_ok=True)
 
     if args.test:
         entries = load_recent_entries(base)
         if not entries:
-            print('no diary entries found')
+            say('no diary entries found')
             return
         e, sim = best_match(args.test, entries)
-        print(f'entries={len(entries)} best_sim={sim:.2f}')
+        say(f'entries={len(entries)} best_sim={sim:.2f}')
         if e and sim >= SIM_THRESHOLD:
             record(base, e, args.test, sim)
-            print(f'recorded, asr_text={e["text"]!r}')
+            say(f'recorded, asr_text={e["text"]!r}')
         else:
-            print('no match above threshold')
+            say('no match above threshold')
         return
 
     # 单实例锁：端口占用说明已有实例在跑
