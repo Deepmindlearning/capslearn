@@ -41,6 +41,14 @@ def log(base: Path, msg: str):
         f.write(f'{datetime.now():%Y-%m-%d %H:%M:%S} {msg}\n')
 
 
+def say(*args):
+    """pythonw（计划任务）下 stdout 不可用，print 需要兜底。"""
+    try:
+        print(*args)
+    except Exception:
+        pass
+
+
 CONTENT_CH = re.compile(r'[A-Za-z0-9一-鿿]')
 EXPAND_MAX = 12  # 替换片段向两侧最多扩展多少个相同字符，以还原完整术语（英文词尾常超 6 字符）
 
@@ -167,37 +175,48 @@ def main():
     ap = argparse.ArgumentParser(description='CapsLearn 学习端')
     ap.add_argument('--base', default=None, help='CapsWriter 根目录（默认自动向上探测）')
     ap.add_argument('--dry-run', action='store_true', help='只分析不写任何文件')
-    ap.add_argument('--all', action='store_true', help='忽略进度，重新处理全部配对')
+    ap.add_argument('--all', action='store_true', help='（已默认全量统计，保留兼容）')
     args = ap.parse_args()
     base = find_base(args.base)
+    try:
+        _run(base, args)
+    except Exception:
+        import traceback
+        log(base, 'ERROR ' + traceback.format_exc().replace('\n', ' | '))
+        raise
+
+
+def _run(base: Path, args):
     learn = base / 'learn'
     corrections = learn / 'corrections.jsonl'
     state_file = learn / 'miner_state.json'
 
     if not corrections.exists():
         log(base, 'RUN no corrections.jsonl, nothing to do')
-        print('no corrections.jsonl yet')
+        say('no corrections.jsonl yet')
         return
 
     all_lines = corrections.read_text(encoding='utf-8').splitlines()
     start = 0
-    if not args.all and state_file.exists():
+    if state_file.exists():
         try:
             start = json.loads(state_file.read_text(encoding='utf-8')).get('processed_lines', 0)
         except Exception:
             start = 0
-    new_lines = all_lines[start:]
-    if not new_lines:
+    n_new = max(0, len(all_lines) - start)
+    if n_new == 0 and not args.all:
         log(base, f'RUN nothing new (processed={start})')
-        print('nothing new since last run')
+        say('nothing new since last run')
         return
 
+    # 全量统计：频次跨天累计，任何纠错攒够第 2 次出现的当天即转正
+    #（增量统计会把同一纠错切进不同批次，永远凑不满阈值——2026-07-14 修）
     rep_counter = Counter()          # key = (核心误写, 核心正确)
     prefixes = {}                    # key -> 各次出现的前缀扩展列表
     suffixes = {}                    # key -> 各次出现的后缀扩展列表
     style_samples = []
     n_pairs = 0
-    for line in new_lines:
+    for idx, line in enumerate(all_lines):
         line = line.strip()
         if not line:
             continue
@@ -215,7 +234,8 @@ def main():
             rep_counter[key] += 1
             prefixes.setdefault(key, []).append(prefix)
             suffixes.setdefault(key, []).append(suffix)
-        if style and len(style_samples) < 10:
+        # 风格抽样只取本次新增的配对，避免每天重复同样内容
+        if style and idx >= start and len(style_samples) < 10:
             style_samples.append((asr, fin))
 
     def common_suffix_of(strs):
@@ -262,9 +282,9 @@ def main():
     now = datetime.now()
     report_dir = learn / 'reports'
     lines_out = [
-        f'# CapsLearn 周报 {now:%Y-%m-%d %H:%M}',
+        f'# CapsLearn 学习报告 {now:%Y-%m-%d %H:%M}',
         '',
-        f'- 本次处理配对：{n_pairs} 对（累计 {start + len(new_lines)} 行）',
+        f'- 语料总量：{n_pairs} 对（本次新增 {n_new} 对）',
         f'- 自动写入 hot.txt：{len(added)} 条',
         f'- 待人工确认候选：{len(candidates)} 条',
         '',
@@ -288,10 +308,10 @@ def main():
         report_dir.mkdir(parents=True, exist_ok=True)
         report = report_dir / f'{now:%Y-%m-%d_%H%M}.md'
         report.write_text('\n'.join(lines_out), encoding='utf-8')
-        state_file.write_text(json.dumps({'processed_lines': start + len(new_lines)}), encoding='utf-8')
-        log(base, f'RUN pairs={n_pairs} added={len(added)} candidates={len(candidates)} report={report.name}')
+        state_file.write_text(json.dumps({'processed_lines': len(all_lines)}), encoding='utf-8')
+        log(base, f'RUN pairs={n_pairs} new={n_new} added={len(added)} candidates={len(candidates)} report={report.name}')
     else:
-        print('\n'.join(lines_out))
+        say('\n'.join(lines_out))
         log(base, f'DRY-RUN pairs={n_pairs} would-add={len(added)}')
 
 
