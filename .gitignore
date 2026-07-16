@@ -11,8 +11,9 @@ backups/
 __pycache__/
 *.pyc
 
-# 构建产物
+# 构建产物与本地部署
 build/
 dist/
 dist-release/
+bin/
 *.spec
