@@ -133,6 +133,26 @@ def load_hot_aliases(hot_path: Path) -> set:
     return aliases
 
 
+def load_denylist(learn: Path) -> set:
+    """否决清单：人工删除过的纠错对，机器永不再自动学。
+
+    格式 learn/denylist.txt 每行一条：误写 | 正确
+    （全量统计会在每次运行时重新计数，没有这份清单，
+    人工从 hot.txt 删掉的词会被下一次运行原样学回来。）
+    """
+    p = learn / 'denylist.txt'
+    pairs = set()
+    if p.exists():
+        for line in p.read_text(encoding='utf-8').splitlines():
+            t = line.strip()
+            if not t or t.startswith('#') or '|' not in t:
+                continue
+            w, r = [x.strip() for x in t.split('|', 1)]
+            if w and r:
+                pairs.add((w, r))
+    return pairs
+
+
 def update_hot(hot_path: Path, additions, backups_dir: Path, dry_run: bool):
     """additions: [(误写, 正确)]。返回实际写入的 [(正确, 误写, 方式)]。"""
     lines = hot_path.read_text(encoding='utf-8').splitlines()
@@ -253,9 +273,12 @@ def _run(base: Path, args):
     # 术语判定：只有所有出现里都紧邻核心的字符才算术语的一部分，
     # 只出现一次的上下文（如"患者服用"）被交集自动剔除
     known = load_hot_aliases(base / 'hot.txt')
+    deny = load_denylist(learn)
     items = []
     for key, c in rep_counter.items():
         ca, cb = key
+        if (ca, cb) in deny:
+            continue
         p = common_suffix_of(prefixes[key])   # 前缀取「贴着核心的公共尾部」
         s = common_prefix_of(suffixes[key])   # 后缀取「贴着核心的公共头部」
         wrong, right = p + ca + s, p + cb + s
@@ -271,6 +294,8 @@ def _run(base: Path, args):
         if len(wrong) < 2 or len(right) < 2:
             continue
         if ca in known or wrong in known:
+            continue
+        if (wrong, right) in deny:
             continue
         items.append(((wrong, right), c))
     auto = [(w, r) for (w, r), c in items if c >= AUTO_ADD_MIN]

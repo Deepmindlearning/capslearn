@@ -1,5 +1,6 @@
 # 运行时数据 —— 永不入库（含个人语料/隐私）
 corrections.jsonl
+denylist.txt
 miner_state.json
 capture.log
 miner.log
